@@ -88,6 +88,7 @@ jobs:
           git reset --hard
           sudo git clean -d -x -f
           rm -r *
+          echo "solmate.quest" > CNAME
           git add .
           git commit -m "cleaning branch"
           git push
@@ -101,8 +102,6 @@ jobs:
           ls
           cp -r * ../../../
           cd ../../../
-          rm -r ${{ vars.BUILD_PATH }}
-          ls
           pwd
       - name: Pushing deployment to gh-pages branch
         run: |

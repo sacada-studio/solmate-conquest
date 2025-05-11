@@ -108,7 +108,7 @@ jobs:
         run: |
           pwd
           git status
-          git add *
+          git add .
           git commit -m "Deployment"
           git push
           git reset --hard

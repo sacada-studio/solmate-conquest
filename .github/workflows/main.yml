@@ -61,6 +61,26 @@ jobs:
           targetPlatform: ${{ vars.TARGET_PLATFORM }}
           buildsPath: ${{ vars.BUILD_PATH }}
           allowDirtyBuild: true
+      
+      # Check build output structure immediately after build
+      - name: Inspect build output structure
+        run: |
+          echo "Checking immediate build output structure:"
+          find ${{ vars.BUILD_PATH }} -type f | sort
+          echo "Target platform directory structure:"
+          find ${{ vars.BUILD_PATH }}/${{ vars.TARGET_PLATFORM }} -type d | sort
+          echo "WebGL build files:"
+          ls -la ${{ vars.BUILD_PATH }}/${{ vars.TARGET_PLATFORM }}
+          echo "Checking for Build folder:"
+          find ${{ vars.BUILD_PATH }} -name "Build" -type d
+          if [ -d "${{ vars.BUILD_PATH }}/${{ vars.TARGET_PLATFORM }}/Build" ]; then
+            echo "Build folder exists at expected location, contents:"
+            ls -la ${{ vars.BUILD_PATH }}/${{ vars.TARGET_PLATFORM }}/Build
+          else
+            echo "Build folder not found at expected location!"
+            echo "Looking for Build folder elsewhere:"
+            find ${{ vars.BUILD_PATH }} -name "Build" -type d
+          fi
       # Output: Artifact
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -75,9 +95,17 @@ jobs:
           git config --global user.email "${{ secrets.GH_EMAIL }}"
           git config --global user.name "${{ secrets.GH_USERNAME }}"
           echo "Stash and reset"
+          echo "Stash build result and reset local changes"
+          echo "Build path contents before stashing:"
+          ls -la ${{ vars.BUILD_PATH }}
+          echo "Target platform folder contents:"
+          ls -la ${{ vars.BUILD_PATH }}/${{ vars.TARGET_PLATFORM }}
+          ls -la ${{ vars.BUILD_PATH }}/${{ vars.TARGET_PLATFORM }}/${{ vars.TARGET_PLATFORM }}
           git add ${{ vars.BUILD_PATH }}/${{ vars.TARGET_PLATFORM }}
           git stash push ${{ vars.BUILD_PATH }}/${{ vars.TARGET_PLATFORM }}
+          echo "Stash contents:"
           git stash list
+          git stash show -p
           git reset --hard
           sudo git clean -d -x -f
     # Deployment
@@ -87,8 +115,12 @@ jobs:
           git switch -f ${{ vars.DEPLOYMENT_BRANCH }}
           git reset --hard
           sudo git clean -d -x -f
+          echo "Current files before removal:"
+          ls -la
           rm -r *
           echo "solmate.quest" > CNAME
+          echo "Files after cleanup:"
+          ls -la
           git add .
           git commit -m "cleaning branch"
           git push
@@ -96,19 +128,53 @@ jobs:
         run: |
           echo "Applying stash"
           git stash apply stash@{0}
+          echo "Files after applying stash:"
+          git status
+          echo "Build path structure after stash apply:"
+          find ${{ vars.BUILD_PATH }} -type d | sort
+          ls -la ${{ vars.BUILD_PATH }}/${{ vars.TARGET_PLATFORM }}
+          ls -la ${{ vars.BUILD_PATH }}/${{ vars.TARGET_PLATFORM }}/${{ vars.TARGET_PLATFORM }}
       - name: Copying files to root directory
         run: |
           cd ${{ vars.BUILD_PATH }}/${{ vars.TARGET_PLATFORM }}/${{ vars.TARGET_PLATFORM }}
-          ls
+          echo "Current directory contents:"
+          ls -la
+          echo "Full path of current directory:"
+          pwd
+          echo "Checking directory structure from here:"
+          find . -type d | sort
+          echo "Checking for Build folder:"
+          find . -name "Build" -type d
+          
+          # Check one level up to see if Build is there
+          echo "Checking one directory up:"
+          ls -la ..
+          find .. -name "Build" -type d
+          
+          # Check two levels up to see if Build is there
+          echo "Checking two directories up:"
+          ls -la ../..
+          find ../.. -name "Build" -type d
+          
+          echo "Copying all files to root directory:"
           cp -r * ../../../
           cd ../../../
-          pwd
+          echo "Root directory contents after copying:"
+          ls -la
       - name: Pushing deployment to gh-pages branch
         run: |
+          echo "Current directory:"
           pwd
+          echo "Git status before commit:"
           git status
+          echo "Listing files in root directory:"
+          ls -la
+          echo "Listing files in Build directory (if it exists):"
+          find . -name "Build" -type d -exec ls -la {} \; || echo "No Build directory found"
           git add .
           git commit -m "Deployment"
+          echo "Git status after commit:"
+          git status
           git push
           git reset --hard
           sudo git clean -d -x -f
